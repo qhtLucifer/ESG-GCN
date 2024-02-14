@@ -8,11 +8,14 @@ from utils.constants import paris
 from utils.tools import load_model_configs
 from utils.tools import calculate_adjacency
 
+
+from einops import rearrange, repeat
+
 from model.RGCN import RGCN
 class ESRGCN(nn.Module):
 
 
-    def __init__(self, args:Dict, semantics_type: List[str] = ['joint']):
+    def __init__(self, args:Dict):
         '''
         semantics_type: `joint`, `bone`, `motion`
 
@@ -23,16 +26,10 @@ class ESRGCN(nn.Module):
         # Initialization.
         self.dataset_type = args.dataset_name
         self.device = args.device
-        self.semantics_type = semantics_type
-        self.input_channels:int = len(semantics_type) * 3 + 2 # 3-dims for each semantics and 2 dims for spatial and frame index semantics.
-        
-
         config:Dict = load_model_configs(args.config_path)
+        self.semantics_type = config['semantics_type']
 
-        # TODO: Load model config.
-
-        pass 
-
+        self.input_channels:int = len(self.semantics_type) * 3 + 2 # 3-dims for each semantics and 2 dims for spatial and frame index semantics.
 
         # Model definition.
 
@@ -54,11 +51,15 @@ class ESRGCN(nn.Module):
         
     def forward(self, inputs : torch.Tensor) -> torch.Tensor:
         '''
-        The shape of inputs: [batch_size, seq_length, num_joints, channels]
+        The shape of inputs: [batch_size, seq_length, num_joints, channels, head_count]
         The shape of outputs: [batch_size,num_classes, 1]
         '''
 
-        B, T, V, C = inputs.shape
+        torch._pad_packed_sequence()
+        B, C, T, V, M = inputs.shape 
+
+        inputs = rearrange(inputs, 'b c t v m -> (b m) t v c')
+
         inputs_concat = inputs
 
         if 'joint' not in self.semantics_type:
@@ -104,10 +105,12 @@ class ESRGCN(nn.Module):
 
         x1 = self.rgcn(inputs_concat)
         print(x1.shape)
-        # Adjust dims.[B, V, C] -> [B, V * C]
+        # Adjust dims: [B, T, V, C] -> [B, V * C]
         x2 = torch.flatten(x1, 1, 2)
         print(x2.shape)
         y = self.fusion_layer(x2)
+
+        y = rearrange(y, '(b m) c t -> b m c t', m = M).mean(1)
 
         return y
 

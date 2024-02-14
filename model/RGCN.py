@@ -62,6 +62,7 @@ class RGCN(nn.Module):
     '''
     
     def __init__(self, input_size: int, hidden_size: int, A: np.array, num_joints: int = 25, hidden_output: bool = False):
+
         super(RGCN, self).__init__()
         self.input_size: int = input_size
         self.hidden_size: int = hidden_size
@@ -72,6 +73,7 @@ class RGCN(nn.Module):
 
 
     def forward(self, X: torch.Tensor, h0 = None):
+        
         # x.shape = (batch_size,seq_length, num_joint, coordinate_dims)
         # h0.shape = (batch_size, num_joint, hidden_size)
         # output.shape = (batch_size, seq_length,num_joint, hidden_size)

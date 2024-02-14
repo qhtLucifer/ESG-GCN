@@ -164,3 +164,7 @@ cython_debug/
 
 # Dataset.
 *.npz
+
+# Logs
+logs
+wandb

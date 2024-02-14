@@ -9,7 +9,7 @@ from feeders import tools
 class Feeder(Dataset):
     def __init__(self, data_path, label_path=None, p_interval=1, split='train', repeat=1, random_choose=False, random_shift=False,
                  random_move=False, random_rot=False, window_size=64, normalization=False, debug=False, use_mmap=False,
-                 vel=False, sort=False, A=None):
+                 sort=False, A=None):
         """
         :param data_path:
         :param label_path:
@@ -22,7 +22,6 @@ class Feeder(Dataset):
         :param normalization: If true, normalize input sequence
         :param debug: If true, only use the first 100 samples
         :param use_mmap: If true, use mmap mode to load data, which can save the running memory
-        :param vel: use motion modality or not
         :param only_label: only load label for ensemble score compute
         """
 
@@ -38,7 +37,7 @@ class Feeder(Dataset):
         self.use_mmap = use_mmap
         self.p_interval = p_interval
         self.random_rot = random_rot
-        self.vel = vel
+
         self.A = A
         self.load_data()
         if sort:
@@ -103,9 +102,7 @@ class Feeder(Dataset):
         mask = (abs(data_numpy.sum(0, keepdims=True).sum(2, keepdims=True)) > 0)
         if self.random_rot:
             data_numpy = tools.random_rot(data_numpy)
-        if self.vel:
-            data_numpy[:, :-1] = data_numpy[:, 1:] - data_numpy[:, :-1]
-            data_numpy[:, -1] = 0
+
         return data_numpy, label, mask, index
 
     def top_k(self, score, top_k):
