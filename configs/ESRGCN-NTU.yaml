@@ -1,0 +1,10 @@
+rgcn:
+  hidden_size: 8
+  num_joints: 25
+  hidden_output: False
+
+fusion_layer:
+  input_shape: 8
+  out_features: 120
+
+semantics_type: ['joint']
