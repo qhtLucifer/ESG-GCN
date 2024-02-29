@@ -1,15 +1,13 @@
 import numpy as np
-import pickle
 
 from torch.utils.data import Dataset
-
+import torch
 from feeders import tools
 
 
 class Feeder(Dataset):
     def __init__(self, data_path, label_path=None, p_interval=1, split='train', repeat=1, random_choose=False, random_shift=False,
-                 random_move=False, random_rot=False, window_size=64, normalization=False, debug=False, use_mmap=False,
-                 sort=False, A=None):
+                 random_move=False, random_rot=False, window_size=-1, normalization=False, debug=False, use_mmap=False, sort=False):
         """
         :param data_path:
         :param label_path:
@@ -22,6 +20,7 @@ class Feeder(Dataset):
         :param normalization: If true, normalize input sequence
         :param debug: If true, only use the first 100 samples
         :param use_mmap: If true, use mmap mode to load data, which can save the running memory
+        :param vel: use motion modality or not
         :param only_label: only load label for ensemble score compute
         """
 
@@ -37,8 +36,6 @@ class Feeder(Dataset):
         self.use_mmap = use_mmap
         self.p_interval = p_interval
         self.random_rot = random_rot
-
-        self.A = A
         self.load_data()
         if sort:
             self.get_n_per_class()
@@ -62,11 +59,7 @@ class Feeder(Dataset):
         self.label = self.label[nan_out]
         self.sample_name = [self.split + '_' + str(i) for i in range(len(self.data))]
         N, T, _ = self.data.shape
-        if self.A is not None:
-            self.data = self.data.reshape((N*T*2, 25, 3))
-            self.data = np.array(self.A) @ self.data # x = N C T V M
-        self.data = self.data.reshape(N, T, 2, 25, 3).transpose(0, 4, 1, 3, 2)
-        # self.data -= self.data[:,:,:,1:2]
+        self.data = self.data.reshape((N, T, 2, 25, 3)).transpose(0, 4, 1, 3, 2)
 
     def get_n_per_class(self):
         self.n_per_cls = np.zeros(len(self.label), dtype=int)
@@ -95,15 +88,32 @@ class Feeder(Dataset):
         data_numpy = self.data[index]
         label = self.label[index]
         data_numpy = np.array(data_numpy)
-        valid_frame = data_numpy.sum(0, keepdims=True).sum(2, keepdims=True)
-        valid_frame_num = np.sum(np.squeeze(valid_frame).sum(-1) != 0)
+        valid_frame_num = np.sum(data_numpy.sum(0).sum(-1).sum(-1) != 0)
         # reshape Tx(MVC) to CTVM
         data_numpy = tools.valid_crop_resize(data_numpy, valid_frame_num, self.p_interval, self.window_size)
-        mask = (abs(data_numpy.sum(0, keepdims=True).sum(2, keepdims=True)) > 0)
         if self.random_rot:
             data_numpy = tools.random_rot(data_numpy)
+      
+            
+        bone_data_numpy = np.zeros_like(data_numpy)
+        ntu_pairs = ((1, 2), (2, 21), (3, 21), (4, 3), (5, 21), (6, 5), (7, 6),
+            (8, 7), (9, 21), (10, 9), (11, 10), (12, 11), (13, 1),
+            (14, 13), (15, 14), (16, 15), (17, 1), (18, 17), (19, 18),
+            (20, 19), (22, 23), (23, 8), (24, 25), (25, 12))   
+        for v1, v2 in ntu_pairs:
+            bone_data_numpy[:, :, v1 - 1] = data_numpy[:, :, v1 - 1] - data_numpy[:, :, v2 - 1]
+        
+        joint_vel_data = np.zeros_like(data_numpy)
+        bone_vel_data = np.zeros_like(bone_data_numpy)
 
-        return data_numpy, label, mask, index
+        joint_vel_data[:, :-1] = data_numpy[:, 1:] - data_numpy[:, :-1]
+        joint_vel_data[:, -1] = 0
+
+        bone_vel_data[:, :-1] = bone_data_numpy[:, 1:] - bone_data_numpy[:, :-1]
+        bone_vel_data[:, -1] = 0
+        
+        final_data = np.concatenate([data_numpy, bone_data_numpy, joint_vel_data, bone_vel_data],0)
+        return final_data, label, index
 
     def top_k(self, score, top_k):
         rank = score.argsort()
