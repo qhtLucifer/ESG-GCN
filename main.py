@@ -251,8 +251,8 @@ class Processor():
             timer['dataloader'] += self.split_time()
 
             # forward
-            y_hat, z = self.model(data)
-            mmd_loss, l2_z_mean, z_mean = get_mmd_loss(z, self.model.z_prior, y, self.arg.num_class)
+            y_hat, z, logvar = self.model(data)
+            mmd_loss, l2_z_mean, z_mean = get_mmd_loss(z, self.model.z_prior, y, self.arg.num_class, logvar)
             cos_z, dis_z = get_vector_property(z_mean)
             cos_z_prior, dis_z_prior = get_vector_property(self.model.z_prior)
             cos_z_value.append(cos_z.data.item())
@@ -321,10 +321,10 @@ class Processor():
                 with torch.no_grad():
                     data = data.float().cuda()
                     y = y.long().cuda()
-                    y_hat, z = self.model(data)
+                    y_hat, z, logvar = self.model(data)
                     if save_z:
                         z_list.append(z.data.cpu().numpy())
-                    mmd_loss, l2_z_mean, z_mean = get_mmd_loss(z, self.model.z_prior, y, self.arg.num_class)
+                    mmd_loss, l2_z_mean, z_mean = get_mmd_loss(z, self.model.z_prior, y, self.arg.num_class, logvar)
                     cos_z, dis_z = get_vector_property(z_mean)
                     cos_z_prior, dis_z_prior = get_vector_property(self.model.z_prior)
                     cos_z_value.append(cos_z.data.item())

@@ -1,7 +1,7 @@
 import numpy as np
 
 from torch.utils.data import Dataset
-import torch
+
 from feeders import tools
 
 
@@ -111,7 +111,7 @@ class Feeder(Dataset):
 
         bone_vel_data[:, :-1] = bone_data_numpy[:, 1:] - bone_data_numpy[:, :-1]
         bone_vel_data[:, -1] = 0
-        
+
         final_data = np.concatenate([data_numpy, bone_data_numpy, joint_vel_data, bone_vel_data],0)
         return final_data, label, index
 
